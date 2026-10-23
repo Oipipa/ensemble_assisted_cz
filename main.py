@@ -1,6 +1,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
-from qutip import basis, sesolve
+from qutip import basis, qeye, sesolve, tensor
 
 
 zero = basis(3, 0)
@@ -25,6 +25,23 @@ plt.plot(times, p_one, label=r"$P_1$ from $|1\rangle$")
 plt.plot(times, p_r, label=r"$P_r$ from $|1\rangle$")
 plt.xlabel("Time")
 plt.ylabel("Population")
+plt.legend()
+plt.tight_layout()
+
+H_pair = tensor(H, qeye(3)) + tensor(qeye(3), H)
+n_r = r * r.dag()
+rydberg_count = tensor(n_r, qeye(3)) + tensor(qeye(3), n_r)
+inputs = [("00", tensor(zero, zero)), ("01", tensor(zero, one)),
+          ("10", tensor(one, zero)), ("11", tensor(one, one))]
+
+plt.figure()
+for label, initial in inputs:
+    result = sesolve(H_pair, initial, times, e_ops=[rydberg_count])
+    print(f"|{label}>: Rydberg excitations after pi pulse = {result.expect[0][200]:.6f}")
+    plt.plot(times, result.expect[0], label=rf"$|{label}\rangle$")
+
+plt.xlabel("Time")
+plt.ylabel("Mean number of Rydberg excitations")
 plt.legend()
 plt.tight_layout()
 plt.show()
