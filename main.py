@@ -44,4 +44,23 @@ plt.xlabel("Time")
 plt.ylabel("Mean number of Rydberg excitations")
 plt.legend()
 plt.tight_layout()
+
+A = basis(2, 0)
+R = basis(2, 1)
+Omega_R = 1.0
+H_ancilla = Omega_R / 2 * (A * R.dag() + R * A.dag())
+ancilla_times = np.linspace(0, 2 * np.pi / Omega_R, 401)
+ancilla_result = sesolve(H_ancilla, A, ancilla_times)
+p_A = [abs(A.overlap(state)) ** 2 for state in ancilla_result.states]
+p_R = [abs(R.overlap(state)) ** 2 for state in ancilla_result.states]
+print(f"Ancilla pi transfer: {p_R[200]:.6f}")
+print(f"Ancilla 2pi return amplitude: {A.overlap(ancilla_result.states[-1]):.6f}")
+
+plt.figure()
+plt.plot(ancilla_times, p_A, label=r"$P_A$")
+plt.plot(ancilla_times, p_R, label=r"$P_R$")
+plt.xlabel("Time")
+plt.ylabel("Population")
+plt.legend()
+plt.tight_layout()
 plt.show()
