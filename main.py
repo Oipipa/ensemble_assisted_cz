@@ -63,4 +63,25 @@ plt.xlabel("Time")
 plt.ylabel("Population")
 plt.legend()
 plt.tight_layout()
+
+H_data_joint = tensor(qeye(2), H, qeye(3)) + tensor(qeye(2), qeye(3), H)
+H_ancilla_joint = tensor(H_ancilla, qeye(3), qeye(3))
+A10 = tensor(A, one, zero)
+R10 = tensor(R, one, zero)
+Ar0 = tensor(A, r, zero)
+print(f"Data drive |A10> -> |Ar0>: {Ar0.overlap(H_data_joint * A10):.3f}")
+print(f"Ancilla drive |A10> -> |R10>: {R10.overlap(H_ancilla_joint * A10):.3f}")
+print(f"Cross action: {R10.overlap(H_data_joint * A10):.3f}, "
+      f"{Ar0.overlap(H_ancilla_joint * A10):.3f}")
+
+joint_result = sesolve(H_data_joint + H_ancilla_joint, A10, times)
+joint_p_R = [abs(R10.overlap(state)) ** 2 for state in joint_result.states]
+joint_p_Ar0 = [abs(Ar0.overlap(state)) ** 2 for state in joint_result.states]
+plt.figure()
+plt.plot(times, joint_p_R, label=r"$P_{R10}$")
+plt.plot(times, joint_p_Ar0, label=r"$P_{Ar0}$")
+plt.xlabel("Time")
+plt.ylabel("Population")
+plt.legend()
+plt.tight_layout()
 plt.show()
