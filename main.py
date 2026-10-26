@@ -1,6 +1,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
-from qutip import basis, qeye, sesolve, tensor
+from qutip import basis, expect, qeye, sesolve, tensor
 
 
 zero = basis(3, 0)
@@ -82,6 +82,34 @@ plt.plot(times, joint_p_R, label=r"$P_{R10}$")
 plt.plot(times, joint_p_Ar0, label=r"$P_{Ar0}$")
 plt.xlabel("Time")
 plt.ylabel("Population")
+plt.legend()
+plt.tight_layout()
+
+data_pi_time = np.pi / Omega
+ancilla_2pi_time = 2 * np.pi / Omega_R
+first_times = np.linspace(0, data_pi_time, 201)
+middle_times = np.linspace(data_pi_time, data_pi_time + ancilla_2pi_time, 401)
+last_times = np.linspace(data_pi_time + ancilla_2pi_time,
+                         2 * data_pi_time + ancilla_2pi_time, 201)
+first = sesolve(H_data_joint, A10, first_times)
+middle = sesolve(H_ancilla_joint, first.states[-1], middle_times)
+last = sesolve(H_data_joint, middle.states[-1], last_times)
+gate_times = np.r_[first_times, middle_times[1:], last_times[1:]]
+gate_states = first.states + middle.states[1:] + last.states[1:]
+P_R_joint = tensor(R * R.dag(), qeye(3), qeye(3))
+data_rydberg_count = tensor(qeye(2), n_r, qeye(3)) + tensor(qeye(2), qeye(3), n_r)
+gate_p_R = expect(P_R_joint, gate_states)
+gate_n_r = expect(data_rydberg_count, gate_states)
+print(f"No interaction: ancilla P_R midway = {gate_p_R[400]:.6f}")
+print(f"No interaction: final |A10> amplitude = {A10.overlap(last.states[-1]):.6f}")
+
+plt.figure()
+plt.plot(gate_times, gate_p_R, label=r"$P_R$")
+plt.plot(gate_times, gate_n_r, label="Data Rydberg count")
+plt.axvline(data_pi_time, color="gray", linestyle=":")
+plt.axvline(data_pi_time + ancilla_2pi_time, color="gray", linestyle=":")
+plt.xlabel("Time")
+plt.ylabel("Population or excitation count")
 plt.legend()
 plt.tight_layout()
 plt.show()
