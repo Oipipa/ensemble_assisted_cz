@@ -112,4 +112,27 @@ plt.xlabel("Time")
 plt.ylabel("Population or excitation count")
 plt.legend()
 plt.tight_layout()
+
+V = 20 * Omega
+H_blockade = V * (tensor(R * R.dag(), n_r, qeye(3))
+                  + tensor(R * R.dag(), qeye(3), n_r))
+first_blocked = sesolve(H_data_joint + H_blockade, A10, first_times)
+middle_blocked = sesolve(H_ancilla_joint + H_blockade,
+                         first_blocked.states[-1], middle_times)
+last_blocked = sesolve(H_data_joint + H_blockade,
+                       middle_blocked.states[-1], last_times)
+blocked_states = (first_blocked.states + middle_blocked.states[1:]
+                  + last_blocked.states[1:])
+blocked_p_R = expect(P_R_joint, blocked_states)
+print(f"Effective blockade: peak ancilla P_R = {max(blocked_p_R):.6f}")
+
+plt.figure()
+plt.plot(gate_times, gate_p_R, label="No interaction")
+plt.plot(gate_times, blocked_p_R, label=rf"Effective blockade $V/\Omega={V/Omega:g}$")
+plt.axvline(data_pi_time, color="gray", linestyle=":")
+plt.axvline(data_pi_time + ancilla_2pi_time, color="gray", linestyle=":")
+plt.xlabel("Time")
+plt.ylabel(r"Ancilla $P_R$")
+plt.legend()
+plt.tight_layout()
 plt.show()
