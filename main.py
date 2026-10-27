@@ -135,4 +135,26 @@ plt.xlabel("Time")
 plt.ylabel(r"Ancilla $P_R$")
 plt.legend()
 plt.tight_layout()
+
+input_curves = {}
+for label, data_state in inputs:
+    initial = tensor(A, data_state)
+    step1 = sesolve(H_data_joint + H_blockade, initial, first_times)
+    step2 = sesolve(H_ancilla_joint + H_blockade, step1.states[-1], middle_times)
+    step3 = sesolve(H_data_joint + H_blockade, step2.states[-1], last_times)
+    full_states = step1.states + step2.states[1:] + step3.states[1:]
+    p_R_curve = expect(P_R_joint, full_states)
+    input_curves[label] = p_R_curve
+    print(f"|A{label}>: peak P_R={max(p_R_curve):.6f}, "
+          f"final return={abs(initial.overlap(step3.states[-1]))**2:.6f}")
+
+plt.figure()
+for label, curve in input_curves.items():
+    plt.plot(gate_times, curve, label=rf"$|A{label}\rangle$")
+plt.axvline(data_pi_time, color="gray", linestyle=":")
+plt.axvline(data_pi_time + ancilla_2pi_time, color="gray", linestyle=":")
+plt.xlabel("Time")
+plt.ylabel(r"Ancilla $P_R$")
+plt.legend()
+plt.tight_layout()
 plt.show()
