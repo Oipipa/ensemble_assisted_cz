@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
+from pathlib import Path
 from qutip import basis, expect, qeye, sesolve, tensor
 
 
@@ -137,12 +138,14 @@ plt.legend()
 plt.tight_layout()
 
 input_curves = {}
+full_state_curves = {}
 for label, data_state in inputs:
     initial = tensor(A, data_state)
     step1 = sesolve(H_data_joint + H_blockade, initial, first_times)
     step2 = sesolve(H_ancilla_joint + H_blockade, step1.states[-1], middle_times)
     step3 = sesolve(H_data_joint + H_blockade, step2.states[-1], last_times)
     full_states = step1.states + step2.states[1:] + step3.states[1:]
+    full_state_curves[label] = full_states
     p_R_curve = expect(P_R_joint, full_states)
     input_curves[label] = p_R_curve
     print(f"|A{label}>: peak P_R={max(p_R_curve):.6f}, "
@@ -157,4 +160,29 @@ plt.xlabel("Time")
 plt.ylabel(r"Ancilla $P_R$")
 plt.legend()
 plt.tight_layout()
+
+fig, axes = plt.subplots(3, 1, figsize=(8, 8), sharex=True)
+for ax, label in zip(axes, ["00", "01", "11"]):
+    data = [zero if bit == "0" else one for bit in label]
+    excited = [zero if bit == "0" else r for bit in label]
+    starting_state = tensor(A, data[0], data[1])
+    raised_state = tensor(A, excited[0], excited[1])
+    blocked_state = tensor(R, excited[0], excited[1])
+    states = full_state_curves[label]
+    ax.plot(gate_times, [abs(starting_state.overlap(s)) ** 2 for s in states],
+            label=rf"$|A{label}\rangle$")
+    if label != "00":
+        ax.plot(gate_times, [abs(raised_state.overlap(s)) ** 2 for s in states],
+                label="Data excited, ancilla A")
+    ax.plot(gate_times, [abs(blocked_state.overlap(s)) ** 2 for s in states],
+            label="Ancilla R")
+    ax.axvline(data_pi_time, color="gray", linestyle=":")
+    ax.axvline(data_pi_time + ancilla_2pi_time, color="gray", linestyle=":")
+    ax.set_ylabel("Population")
+    ax.legend(loc="center right")
+axes[-1].set_xlabel(r"Time ($1/\Omega$)")
+fig.suptitle("Figure 3(c) comparison: effective blockade model")
+fig.tight_layout()
+Path("figures").mkdir(exist_ok=True)
+fig.savefig("figures/fig3c_effective.png", dpi=150)
 plt.show()
