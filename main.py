@@ -7,7 +7,7 @@ from qutip import basis, expect, qeye, sesolve, tensor
 zero = basis(3, 0)
 one = basis(3, 1)
 r = basis(3, 2)
-Omega = 1.0
+Omega = 2 * np.pi * 10  # radians per microsecond
 H = Omega / 2 * (one * r.dag() + r * one.dag())
 times = np.linspace(0, 2 * np.pi / Omega, 401)
 
@@ -24,7 +24,7 @@ print(f"2pi-pulse return amplitude: {one.overlap(result_one.states[-1]):.6f}")
 plt.plot(times, p_zero, label=r"$P_0$ from $|0\rangle$")
 plt.plot(times, p_one, label=r"$P_1$ from $|1\rangle$")
 plt.plot(times, p_r, label=r"$P_r$ from $|1\rangle$")
-plt.xlabel("Time")
+plt.xlabel(r"Time ($\mu$s)")
 plt.ylabel("Population")
 plt.legend()
 plt.tight_layout()
@@ -41,14 +41,14 @@ for label, initial in inputs:
     print(f"|{label}>: Rydberg excitations after pi pulse = {result.expect[0][200]:.6f}")
     plt.plot(times, result.expect[0], label=rf"$|{label}\rangle$")
 
-plt.xlabel("Time")
+plt.xlabel(r"Time ($\mu$s)")
 plt.ylabel("Mean number of Rydberg excitations")
 plt.legend()
 plt.tight_layout()
 
 A = basis(2, 0)
 R = basis(2, 1)
-Omega_R = 1.0
+Omega_R = 2 * np.pi * 10
 H_ancilla = Omega_R / 2 * (A * R.dag() + R * A.dag())
 ancilla_times = np.linspace(0, 2 * np.pi / Omega_R, 401)
 ancilla_result = sesolve(H_ancilla, A, ancilla_times)
@@ -60,7 +60,7 @@ print(f"Ancilla 2pi return amplitude: {A.overlap(ancilla_result.states[-1]):.6f}
 plt.figure()
 plt.plot(ancilla_times, p_A, label=r"$P_A$")
 plt.plot(ancilla_times, p_R, label=r"$P_R$")
-plt.xlabel("Time")
+plt.xlabel(r"Time ($\mu$s)")
 plt.ylabel("Population")
 plt.legend()
 plt.tight_layout()
@@ -81,13 +81,14 @@ joint_p_Ar0 = [abs(Ar0.overlap(state)) ** 2 for state in joint_result.states]
 plt.figure()
 plt.plot(times, joint_p_R, label=r"$P_{R10}$")
 plt.plot(times, joint_p_Ar0, label=r"$P_{Ar0}$")
-plt.xlabel("Time")
+plt.xlabel(r"Time ($\mu$s)")
 plt.ylabel("Population")
 plt.legend()
 plt.tight_layout()
 
 data_pi_time = np.pi / Omega
 ancilla_2pi_time = 2 * np.pi / Omega_R
+print(f"Paper-parameter gate duration: {2 * data_pi_time + ancilla_2pi_time:.3f} microseconds")
 first_times = np.linspace(0, data_pi_time, 201)
 middle_times = np.linspace(data_pi_time, data_pi_time + ancilla_2pi_time, 401)
 last_times = np.linspace(data_pi_time + ancilla_2pi_time,
@@ -109,12 +110,12 @@ plt.plot(gate_times, gate_p_R, label=r"$P_R$")
 plt.plot(gate_times, gate_n_r, label="Data Rydberg count")
 plt.axvline(data_pi_time, color="gray", linestyle=":")
 plt.axvline(data_pi_time + ancilla_2pi_time, color="gray", linestyle=":")
-plt.xlabel("Time")
+plt.xlabel(r"Time ($\mu$s)")
 plt.ylabel("Population or excitation count")
 plt.legend()
 plt.tight_layout()
 
-V = 20 * Omega
+V = 2 * np.pi * 200
 H_blockade = V * (tensor(R * R.dag(), n_r, qeye(3))
                   + tensor(R * R.dag(), qeye(3), n_r))
 first_blocked = sesolve(H_data_joint + H_blockade, A10, first_times)
@@ -132,7 +133,7 @@ plt.plot(gate_times, gate_p_R, label="No interaction")
 plt.plot(gate_times, blocked_p_R, label=rf"Effective blockade $V/\Omega={V/Omega:g}$")
 plt.axvline(data_pi_time, color="gray", linestyle=":")
 plt.axvline(data_pi_time + ancilla_2pi_time, color="gray", linestyle=":")
-plt.xlabel("Time")
+plt.xlabel(r"Time ($\mu$s)")
 plt.ylabel(r"Ancilla $P_R$")
 plt.legend()
 plt.tight_layout()
@@ -156,7 +157,7 @@ for label, curve in input_curves.items():
     plt.plot(gate_times, curve, label=rf"$|A{label}\rangle$")
 plt.axvline(data_pi_time, color="gray", linestyle=":")
 plt.axvline(data_pi_time + ancilla_2pi_time, color="gray", linestyle=":")
-plt.xlabel("Time")
+plt.xlabel(r"Time ($\mu$s)")
 plt.ylabel(r"Ancilla $P_R$")
 plt.legend()
 plt.tight_layout()
@@ -180,7 +181,7 @@ for ax, label in zip(axes, ["00", "01", "11"]):
     ax.axvline(data_pi_time + ancilla_2pi_time, color="gray", linestyle=":")
     ax.set_ylabel("Population")
     ax.legend(loc="center right")
-axes[-1].set_xlabel(r"Time ($1/\Omega$)")
+axes[-1].set_xlabel(r"Time ($\mu$s)")
 fig.suptitle("Figure 3(c) comparison: effective blockade model")
 fig.tight_layout()
 Path("figures").mkdir(exist_ok=True)
