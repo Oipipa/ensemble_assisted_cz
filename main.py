@@ -140,6 +140,7 @@ plt.tight_layout()
 
 input_curves = {}
 full_state_curves = {}
+final_gate_states = {}
 for label, data_state in inputs:
     initial = tensor(A, data_state)
     step1 = sesolve(H_data_joint + H_blockade, initial, first_times)
@@ -147,6 +148,7 @@ for label, data_state in inputs:
     step3 = sesolve(H_data_joint + H_blockade, step2.states[-1], last_times)
     full_states = step1.states + step2.states[1:] + step3.states[1:]
     full_state_curves[label] = full_states
+    final_gate_states[label] = step3.states[-1]
     p_R_curve = expect(P_R_joint, full_states)
     input_curves[label] = p_R_curve
     print(f"|A{label}>: peak P_R={max(p_R_curve):.6f}, "
@@ -186,4 +188,23 @@ fig.suptitle("Figure 3(c) comparison: effective blockade model")
 fig.tight_layout()
 Path("figures").mkdir(exist_ok=True)
 fig.savefig("figures/fig3c_effective.png", dpi=150)
+
+final_amplitudes = {}
+for label, data_state in inputs:
+    initial = tensor(A, data_state)
+    final_amplitudes[label] = initial.overlap(final_gate_states[label])
+reference = final_amplitudes["00"]
+relative_phases = [np.angle(final_amplitudes[label] / reference)
+                   for label, _ in inputs]
+returns = [abs(final_amplitudes[label]) ** 2 for label, _ in inputs]
+for (label, _), phase, returned in zip(inputs, relative_phases, returns):
+    print(f"|A{label}>: return={returned:.6f}, phase relative to 00={phase:.6f} rad")
+
+phase_fig, phase_axes = plt.subplots(1, 2, figsize=(8, 3))
+phase_axes[0].bar([label for label, _ in inputs], returns)
+phase_axes[0].set_ylabel("Return probability")
+phase_axes[0].set_ylim(0, 1.05)
+phase_axes[1].bar([label for label, _ in inputs], relative_phases)
+phase_axes[1].set_ylabel("Phase relative to 00 (rad)")
+phase_fig.tight_layout()
 plt.show()
