@@ -207,4 +207,30 @@ phase_axes[0].set_ylim(0, 1.05)
 phase_axes[1].bar([label for label, _ in inputs], relative_phases)
 phase_axes[1].set_ylabel("Phase relative to 00 (rad)")
 phase_fig.tight_layout()
+
+computational_states = [tensor(A, data_state) for _, data_state in inputs]
+effective_gate = np.array([
+    [bra.overlap(final_gate_states[label]) for label, _ in inputs]
+    for bra in computational_states
+])
+Z1Z2 = np.diag([1, -1, -1, 1])
+paper_operation = Z1Z2 @ np.diag([-1, 1, 1, 1])
+CZ = np.diag([1, 1, 1, -1])
+leakage = 1 - np.sum(abs(effective_gate) ** 2, axis=0)
+print("Effective computational operation:")
+print(np.round(effective_gate, 4))
+print(f"Maximum difference from paper Eq. (4): "
+      f"{np.max(abs(effective_gate - paper_operation)):.4f}")
+print(f"Maximum computational leakage: {max(leakage):.6f}")
+assert np.array_equal(paper_operation, -CZ)
+
+plus_plus = sum(computational_states[1:], computational_states[0]) / 2
+super_first = sesolve(H_data_joint + H_blockade, plus_plus, first_times)
+super_middle = sesolve(H_ancilla_joint + H_blockade,
+                       super_first.states[-1], middle_times)
+super_last = sesolve(H_data_joint + H_blockade,
+                     super_middle.states[-1], last_times)
+ideal_super_output = -plus_plus + computational_states[3]
+super_fidelity = abs(ideal_super_output.overlap(super_last.states[-1])) ** 2
+print(f"|++> output fidelity to ideal Eq. (4): {super_fidelity:.6f}")
 plt.show()
