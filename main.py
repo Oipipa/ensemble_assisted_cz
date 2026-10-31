@@ -258,4 +258,39 @@ fine_last = sesolve(H_data_joint + H_blockade,
 convergence_error = (fine_last.states[-1] - final_gate_states["01"]).norm()
 print(f"Fine-grid final-state difference: {convergence_error:.2e}")
 assert convergence_error < 1e-4
+
+
+def run_effective_gate(initial, V_ratio):
+    blockade = V_ratio * Omega * (H_blockade / V)
+    start = sesolve(H_data_joint + blockade, initial, first_times)
+    middle = sesolve(H_ancilla_joint + blockade, start.states[-1], middle_times)
+    end = sesolve(H_data_joint + blockade, middle.states[-1], last_times)
+    return end.states[-1]
+
+
+interaction_ratios = [2, 5, 10, 20, 40, 80]
+leakage_by_V = []
+phase_error_by_V = []
+gate_error_by_V = []
+for V_ratio in interaction_ratios:
+    outputs = [run_effective_gate(state, V_ratio) for state in computational_states]
+    matrix = np.array([[bra.overlap(ket) for ket in outputs]
+                       for bra in computational_states])
+    leakage_by_V.append(max(1 - np.sum(abs(matrix) ** 2, axis=0)))
+    phase_error_by_V.append(max(abs(np.angle(np.diag(matrix) / np.diag(paper_operation)))))
+    gate_error_by_V.append(np.max(abs(matrix - paper_operation)))
+    print(f"V/Omega={V_ratio:>2}: leakage={leakage_by_V[-1]:.2e}, "
+          f"phase error={phase_error_by_V[-1]:.4f} rad, "
+          f"matrix error={gate_error_by_V[-1]:.4f}")
+
+error_fig, error_axes = plt.subplots(1, 2, figsize=(9, 3))
+error_axes[0].plot(interaction_ratios, leakage_by_V, "o-")
+error_axes[0].set_ylabel("Max computational leakage")
+error_axes[1].plot(interaction_ratios, phase_error_by_V, "o-", label="Phase (rad)")
+error_axes[1].plot(interaction_ratios, gate_error_by_V, "s--", label="Matrix deviation")
+error_axes[1].set_ylabel("Error")
+error_axes[1].legend()
+for ax in error_axes:
+    ax.set_xlabel(r"$V/\Omega$")
+error_fig.tight_layout()
 plt.show()
