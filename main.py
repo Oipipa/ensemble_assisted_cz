@@ -233,4 +233,29 @@ super_last = sesolve(H_data_joint + H_blockade,
 ideal_super_output = -plus_plus + computational_states[3]
 super_fidelity = abs(ideal_super_output.overlap(super_last.states[-1])) ** 2
 print(f"|++> output fidelity to ideal Eq. (4): {super_fidelity:.6f}")
+
+for Hamiltonian in [H_data_joint, H_ancilla_joint, H_blockade]:
+    assert Hamiltonian.isherm
+assert np.isclose(Omega * data_pi_time, np.pi)
+assert np.isclose(Omega_R * ancilla_2pi_time, 2 * np.pi)
+max_norm_error = max(abs(state.norm() - 1)
+                     for states in full_state_curves.values() for state in states)
+print(f"Maximum state-norm error: {max_norm_error:.2e}")
+assert max_norm_error < 1e-8
+assert min(returns) > 0.999
+assert super_fidelity > 0.998
+
+fine_first_times = np.linspace(0, data_pi_time, 401)
+fine_middle_times = np.linspace(data_pi_time, data_pi_time + ancilla_2pi_time, 801)
+fine_last_times = np.linspace(data_pi_time + ancilla_2pi_time,
+                              2 * data_pi_time + ancilla_2pi_time, 401)
+fine_initial = computational_states[1]
+fine_first = sesolve(H_data_joint + H_blockade, fine_initial, fine_first_times)
+fine_middle = sesolve(H_ancilla_joint + H_blockade,
+                      fine_first.states[-1], fine_middle_times)
+fine_last = sesolve(H_data_joint + H_blockade,
+                    fine_middle.states[-1], fine_last_times)
+convergence_error = (fine_last.states[-1] - final_gate_states["01"]).norm()
+print(f"Fine-grid final-state difference: {convergence_error:.2e}")
+assert convergence_error < 1e-4
 plt.show()

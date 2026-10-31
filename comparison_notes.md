@@ -1,0 +1,3 @@
+The effective-blockade plot is a qualitative comparison with [Figure 3(c) of Zhang et al. (2025)](https://arxiv.org/abs/2503.16896). The pulse boundaries are 0.05, 0.15, and 0.20 microseconds. The $|A00\rangle$ input completes an ancilla cycle. The other inputs excite data qubits while the ancilla transition is blocked. All inputs return near their starting populations.
+
+This model replaces the resonant Förster pair-state coupling by a diagonal energy shift. It also omits Rydberg decay. Its small residual excitation and phase errors should therefore not be read as a quantitative reproduction of the paper's curves or Table II.
