@@ -293,4 +293,45 @@ error_axes[1].legend()
 for ax in error_axes:
     ax.set_xlabel(r"$V/\Omega$")
 error_fig.tight_layout()
+
+from qutip import mesolve
+
+zero4, one4, r4, lost4 = [basis(4, i) for i in range(4)]
+I4 = qeye(4)
+n4 = r4 * r4.dag()
+loss4 = lost4 * lost4.dag()
+H_data4 = Omega / 2 * (one4 * r4.dag() + r4 * one4.dag())
+H_joint_data4 = tensor(qeye(2), H_data4, I4) + tensor(qeye(2), I4, H_data4)
+H_joint_ancilla4 = tensor(H_ancilla, I4, I4)
+H_joint_blockade4 = V * (tensor(R * R.dag(), n4, I4)
+                          + tensor(R * R.dag(), I4, n4))
+Gamma_r = 1 / 100  # per microsecond; all r decay goes to an explicit loss state
+jump4 = lost4 * r4.dag()
+data_jumps = [np.sqrt(Gamma_r) * tensor(qeye(2), jump4, I4),
+              np.sqrt(Gamma_r) * tensor(qeye(2), I4, jump4)]
+initial4 = tensor(A, one4, one4)
+rho_initial4 = initial4 * initial4.dag()
+noisy_first = mesolve(H_joint_data4 + H_joint_blockade4, rho_initial4,
+                      first_times, c_ops=data_jumps)
+noisy_middle = mesolve(H_joint_ancilla4 + H_joint_blockade4,
+                       noisy_first.states[-1], middle_times, c_ops=data_jumps)
+noisy_last = mesolve(H_joint_data4 + H_joint_blockade4,
+                     noisy_middle.states[-1], last_times, c_ops=data_jumps)
+noisy_states = noisy_first.states + noisy_middle.states[1:] + noisy_last.states[1:]
+loss_count4 = tensor(qeye(2), loss4, I4) + tensor(qeye(2), I4, loss4)
+noisy_loss = expect(loss_count4, noisy_states)
+final_survival = expect(initial4 * initial4.dag(), noisy_last.states[-1])
+print(f"Data decay: final |A11> return={final_survival:.6f}, "
+      f"mean lost atoms={noisy_loss[-1]:.6f}")
+assert abs(noisy_last.states[-1].tr() - 1) < 1e-8
+assert final_survival < returns[3]
+
+plt.figure()
+plt.plot(gate_times, noisy_loss, label="Mean lost data atoms")
+plt.plot(gate_times, expect(initial4 * initial4.dag(), noisy_states),
+         label=r"$P_{A11}$ with decay")
+plt.xlabel(r"Time ($\mu$s)")
+plt.ylabel("Population or loss count")
+plt.legend()
+plt.tight_layout()
 plt.show()
