@@ -334,4 +334,57 @@ plt.xlabel(r"Time ($\mu$s)")
 plt.ylabel("Population or loss count")
 plt.legend()
 plt.tight_layout()
+
+A3, R3, lostA3 = [basis(3, i) for i in range(3)]
+I3 = qeye(3)
+H_ancilla3 = Omega_R / 2 * (A3 * R3.dag() + R3 * A3.dag())
+H_data43 = tensor(I3, H_data4, I4) + tensor(I3, I4, H_data4)
+H_ancilla43 = tensor(H_ancilla3, I4, I4)
+H_block43 = V * (tensor(R3 * R3.dag(), n4, I4)
+                 + tensor(R3 * R3.dag(), I4, n4))
+data_jumps43 = [np.sqrt(Gamma_r) * tensor(I3, jump4, I4),
+                np.sqrt(Gamma_r) * tensor(I3, I4, jump4)]
+Gamma_ancilla = 1 / 200
+ancilla_jumps43 = [np.sqrt(Gamma_ancilla) * tensor(lostA3 * A3.dag(), I4, I4),
+                   np.sqrt(Gamma_ancilla) * tensor(lostA3 * R3.dag(), I4, I4)]
+
+
+def evolve_open_gate(initial, jumps):
+    rho = initial * initial.dag()
+    first = mesolve(H_data43 + H_block43, rho, first_times, c_ops=jumps)
+    middle = mesolve(H_ancilla43 + H_block43,
+                     first.states[-1], middle_times, c_ops=jumps)
+    last = mesolve(H_data43 + H_block43,
+                   middle.states[-1], last_times, c_ops=jumps)
+    return first.states + middle.states[1:] + last.states[1:]
+
+
+initial_A11 = tensor(A3, one4, one4)
+initial_A00 = tensor(A3, zero4, zero4)
+ancilla_only = evolve_open_gate(initial_A11, ancilla_jumps43)
+combined_decay = evolve_open_gate(initial_A11, data_jumps43 + ancilla_jumps43)
+ancilla_00 = evolve_open_gate(initial_A00, ancilla_jumps43)
+P_A43 = tensor(A3 * A3.dag(), I4, I4)
+P_R43 = tensor(R3 * R3.dag(), I4, I4)
+P_lostA43 = tensor(lostA3 * lostA3.dag(), I4, I4)
+P_lost_data43 = tensor(I3, loss4, I4) + tensor(I3, I4, loss4)
+for label, states in [("A11", ancilla_only), ("A00", ancilla_00)]:
+    loss_from_A = Gamma_ancilla * np.trapezoid(expect(P_A43, states), gate_times)
+    loss_from_R = Gamma_ancilla * np.trapezoid(expect(P_R43, states), gate_times)
+    print(f"Ancilla-only |{label}>: loss from A={loss_from_A:.6f}, "
+          f"loss from R={loss_from_R:.6f}")
+
+return_ancilla_only = expect(initial_A11 * initial_A11.dag(), ancilla_only[-1])
+return_combined = expect(initial_A11 * initial_A11.dag(), combined_decay[-1])
+print(f"|A11> return: ancilla decay={return_ancilla_only:.6f}, "
+      f"data + ancilla decay={return_combined:.6f}")
+assert return_combined < return_ancilla_only < returns[3]
+
+plt.figure()
+plt.plot(gate_times, expect(P_lostA43, ancilla_only), label="Ancilla loss")
+plt.plot(gate_times, expect(P_lost_data43, combined_decay), label="Data loss (both)")
+plt.xlabel(r"Time ($\mu$s)")
+plt.ylabel("Loss probability or count")
+plt.legend()
+plt.tight_layout()
 plt.show()
