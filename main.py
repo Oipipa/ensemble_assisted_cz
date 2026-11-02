@@ -387,4 +387,48 @@ plt.xlabel(r"Time ($\mu$s)")
 plt.ylabel("Loss probability or count")
 plt.legend()
 plt.tight_layout()
+
+
+def evolve_open_operator(rho, jumps):
+    short_first = [0, data_pi_time]
+    short_middle = [data_pi_time, data_pi_time + ancilla_2pi_time]
+    short_last = [data_pi_time + ancilla_2pi_time,
+                  2 * data_pi_time + ancilla_2pi_time]
+    options = {"normalize_output": False, "rtol": 1e-9, "atol": 1e-11}
+    first = mesolve(H_data43 + H_block43, rho, short_first,
+                    c_ops=jumps, options=options)
+    middle = mesolve(H_ancilla43 + H_block43, first.states[-1], short_middle,
+                     c_ops=jumps, options=options)
+    last = mesolve(H_data43 + H_block43, middle.states[-1], short_last,
+                   c_ops=jumps, options=options)
+    return last.states[-1]
+
+
+def data_channel(rho_data):
+    rho_full = tensor(A3 * A3.dag(), rho_data)
+    final_full = evolve_open_operator(rho_full, data_jumps43 + ancilla_jumps43)
+    return final_full.ptrace([1, 2])
+
+
+data_comp_states = [tensor(zero4, zero4), tensor(zero4, one4),
+                    tensor(one4, zero4), tensor(one4, one4)]
+channel_basis = {}
+for i, ket in enumerate(data_comp_states):
+    for j, bra in enumerate(data_comp_states):
+        channel_basis[i, j] = data_channel(ket * bra.dag())
+
+data_plus_plus = sum(data_comp_states[1:], data_comp_states[0]) / 2
+rho_plus_plus = data_plus_plus * data_plus_plus.dag()
+direct_output = data_channel(rho_plus_plus)
+linear_output = sum(channel_basis.values()) / 4
+linearity_error = (direct_output - linear_output).norm()
+P_comp_data = tensor(zero4 * zero4.dag() + one4 * one4.dag(),
+                     zero4 * zero4.dag() + one4 * one4.dag())
+channel_leakage = 1 - expect(P_comp_data, direct_output)
+print(f"Noisy channel: trace={direct_output.tr():.6f}, "
+      f"linearity error={linearity_error:.2e}, leakage={channel_leakage:.6f}")
+assert abs(direct_output.tr() - 1) < 1e-6
+assert direct_output.isherm
+assert linearity_error < 1e-6
+assert channel_leakage > 0
 plt.show()
