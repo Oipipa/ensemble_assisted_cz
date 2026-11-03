@@ -431,4 +431,30 @@ assert abs(direct_output.tr() - 1) < 1e-6
 assert direct_output.isherm
 assert linearity_error < 1e-6
 assert channel_leakage > 0
+
+target_data_states = [-data_comp_states[0], -data_comp_states[1],
+                      -data_comp_states[2], data_comp_states[3]]
+identity_output = sum(channel_basis[i, i] for i in range(4))
+first_fidelity_term = expect(P_comp_data, identity_output)
+second_fidelity_term = sum(
+    target_data_states[i].overlap(channel_basis[i, j] * target_data_states[j])
+    for i in range(4) for j in range(4)
+)
+average_fidelity = np.real((first_fidelity_term + second_fidelity_term) / (4 * 5))
+
+rng = np.random.default_rng(2025)
+channel_arrays = np.array([[channel_basis[i, j].full() for j in range(4)]
+                           for i in range(4)])
+target_columns = np.column_stack([state.full().ravel() for state in target_data_states])
+sample_fidelities = []
+for _ in range(2000):
+    coefficients = rng.normal(size=4) + 1j * rng.normal(size=4)
+    coefficients /= np.linalg.norm(coefficients)
+    output = np.einsum("i,j,ijab->ab", coefficients, coefficients.conj(), channel_arrays)
+    target = target_columns @ coefficients
+    sample_fidelities.append(np.vdot(target, output @ target).real)
+monte_carlo_fidelity = np.mean(sample_fidelities)
+print(f"Average gate fidelity: {average_fidelity:.6f}; "
+      f"Haar sample check: {monte_carlo_fidelity:.6f}")
+assert abs(average_fidelity - monte_carlo_fidelity) < 5e-4
 plt.show()

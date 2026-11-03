@@ -1,3 +1,5 @@
 The effective-blockade plot is a qualitative comparison with [Figure 3(c) of Zhang et al. (2025)](https://arxiv.org/abs/2503.16896). The pulse boundaries are 0.05, 0.15, and 0.20 microseconds. The $|A00\rangle$ input completes an ancilla cycle. The other inputs excite data qubits while the ancilla transition is blocked. All inputs return near their starting populations.
 
 This model replaces the resonant Förster pair-state coupling by a diagonal energy shift. It also omits Rydberg decay. Its small residual excitation and phase errors should therefore not be read as a quantitative reproduction of the paper's curves or Table II.
+
+The later noisy-channel calculation follows the Haar-average fidelity definition in Supplementary Section II, Eqs. (4)-(5). It traces out the ancilla but retains the data loss states. The computational output is not renormalized. With the stated lifetimes and effective diagonal blockade, the calculated average fidelity is 0.997351; a reproducible 2000-state Haar sample gives 0.997353. This is below the paper's 0.9980 target, and it is not yet the same physical model.
