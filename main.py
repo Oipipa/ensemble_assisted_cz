@@ -404,9 +404,11 @@ def evolve_open_operator(rho, jumps):
     return last.states[-1]
 
 
-def data_channel(rho_data):
+def data_channel(rho_data, jumps=None):
+    if jumps is None:
+        jumps = data_jumps43 + ancilla_jumps43
     rho_full = tensor(A3 * A3.dag(), rho_data)
-    final_full = evolve_open_operator(rho_full, data_jumps43 + ancilla_jumps43)
+    final_full = evolve_open_operator(rho_full, jumps)
     return final_full.ptrace([1, 2])
 
 
@@ -457,4 +459,38 @@ monte_carlo_fidelity = np.mean(sample_fidelities)
 print(f"Average gate fidelity: {average_fidelity:.6f}; "
       f"Haar sample check: {monte_carlo_fidelity:.6f}")
 assert abs(average_fidelity - monte_carlo_fidelity) < 5e-4
+
+
+def fidelity_from_basis(basis_outputs):
+    identity = sum(basis_outputs[i, i] for i in range(4))
+    term_one = expect(P_comp_data, identity)
+    term_two = sum(
+        target_data_states[i].overlap(basis_outputs[i, j] * target_data_states[j])
+        for i in range(4) for j in range(4)
+    )
+    return np.real((term_one + term_two) / 20)
+
+
+assert abs(fidelity_from_basis(channel_basis) - average_fidelity) < 1e-10
+isolated_fidelity = {}
+for name, jumps in [("no_decay", []), ("data_only", data_jumps43),
+                    ("ancilla_only", ancilla_jumps43)]:
+    outputs = {}
+    for i, ket in enumerate(data_comp_states):
+        for j, bra in enumerate(data_comp_states):
+            outputs[i, j] = data_channel(ket * bra.dag(), jumps)
+    isolated_fidelity[name] = fidelity_from_basis(outputs)
+    print(f"Channel fidelity, {name}: {isolated_fidelity[name]:.6f}")
+
+rydberg_integrals = [np.trapezoid(expect(data_rydberg_count, full_state_curves[label]),
+                                  gate_times) for label, _ in inputs]
+data_decay_estimate = Gamma_r * np.mean(rydberg_integrals)
+ancilla_decay_estimate = Gamma_ancilla * (3 * np.pi / (5 * Omega)
+                                             + 3 * np.pi / (5 * Omega_R))
+print(f"Eq. (28) data-decay estimate: {data_decay_estimate:.6f}; "
+      f"ancilla estimate: {ancilla_decay_estimate:.6f}")
+print(f"Isolated simulated errors: data={isolated_fidelity['no_decay']-isolated_fidelity['data_only']:.6f}, "
+      f"ancilla={isolated_fidelity['no_decay']-isolated_fidelity['ancilla_only']:.6f}, "
+      f"finite blockade={1-isolated_fidelity['no_decay']:.6f}")
+print(f"Combined infidelity={1-average_fidelity:.6f}; paper Table II=0.002000")
 plt.show()
