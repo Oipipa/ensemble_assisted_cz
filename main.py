@@ -558,4 +558,39 @@ plt.xlabel(r"Time ($\mu$s)")
 plt.ylabel(r"Ancilla $P_R$")
 plt.legend()
 plt.tight_layout()
+
+splitting = np.sqrt(Omega**2 + 4 * V**2)
+dark_state = (2 * V * sub_one_R - Omega * sub_rp_Rp) / splitting
+bright_state = (Omega * sub_one_R + 2 * V * sub_rp_Rp) / splitting
+eigenvalues, eigenstates = H_forster_sub.eigenstates()
+expected_eigenvalues = np.array([-splitting / 2, 0, splitting / 2])
+eigenvalue_error = np.max(abs(eigenvalues - expected_eigenvalues))
+dark_eigenstate = eigenstates[np.argmin(abs(eigenvalues))]
+dark_overlap = abs(dark_state.overlap(dark_eigenstate)) ** 2
+bright_coupling_error = (H_forster_sub * bright_state
+                         - splitting / 2 * sub_r_R).norm()
+print(f"Dressed-state eigenvalue error={eigenvalue_error:.2e}, "
+      f"dark overlap={dark_overlap:.9f}, "
+      f"bright coupling error={bright_coupling_error:.2e}")
+assert eigenvalue_error < 1e-9
+assert dark_overlap > 1 - 1e-10
+assert (H_forster_sub * dark_state).norm() < 1e-10
+assert bright_coupling_error < 1e-10
+
+dark_weights = []
+for ratio in [1, 2, 5, 10, 20, 40]:
+    coupling = ratio * Omega
+    H3 = (Omega / 2 * (sub_one_R * sub_r_R.dag() + sub_r_R * sub_one_R.dag())
+          + coupling * (sub_r_R * sub_rp_Rp.dag()
+                        + sub_rp_Rp * sub_r_R.dag()))
+    vals, vecs = H3.eigenstates()
+    dark = vecs[np.argmin(abs(vals))]
+    dark_weights.append(abs(sub_one_R.overlap(dark)) ** 2)
+
+plt.figure()
+plt.plot([1, 2, 5, 10, 20, 40], dark_weights, "o-")
+plt.xlabel(r"$V_{Rr}/\Omega_r$")
+plt.ylabel(r"Bare $|1R\rangle$ weight in dark state")
+plt.ylim(0, 1.02)
+plt.tight_layout()
 plt.show()
