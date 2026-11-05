@@ -493,4 +493,69 @@ print(f"Isolated simulated errors: data={isolated_fidelity['no_decay']-isolated_
       f"ancilla={isolated_fidelity['no_decay']-isolated_fidelity['ancilla_only']:.6f}, "
       f"finite blockade={1-isolated_fidelity['no_decay']:.6f}")
 print(f"Combined infidelity={1-average_fidelity:.6f}; paper Table II=0.002000")
+
+sub_one_R, sub_r_R, sub_rp_Rp = [basis(3, i) for i in range(3)]
+H_forster_sub = (Omega / 2 * (sub_one_R * sub_r_R.dag()
+                               + sub_r_R * sub_one_R.dag())
+                 + V * (sub_r_R * sub_rp_Rp.dag()
+                        + sub_rp_Rp * sub_r_R.dag()))
+sub_times = np.linspace(0, data_pi_time, 1000)
+sub_result = sesolve(H_forster_sub, sub_one_R, sub_times)
+sub_populations = [[abs(basis_state.overlap(state)) ** 2
+                    for state in sub_result.states]
+                   for basis_state in [sub_one_R, sub_r_R, sub_rp_Rp]]
+print(f"Eq. (29) subsystem: peak |rR>={max(sub_populations[1]):.6f}, "
+      f"peak |r'R'>={max(sub_populations[2]):.6f}")
+expected_rR_peak = Omega**2 / (Omega**2 + 4 * V**2)
+expected_rpRp_peak = 16 * Omega**2 * V**2 / (Omega**2 + 4 * V**2)**2
+assert abs(max(sub_populations[1]) - expected_rR_peak) < 1e-5
+assert abs(max(sub_populations[2]) - expected_rpRp_peak) < 1e-5
+
+plt.figure()
+for population, label in zip(sub_populations,
+                             [r"$|1R\rangle$", r"$|rR\rangle$", r"$|r'R'\rangle$"]):
+    plt.plot(sub_times, population, label=label)
+plt.xlabel(r"Time ($\mu$s)")
+plt.ylabel("Population")
+plt.legend()
+plt.tight_layout()
+
+A_F, R_F, Rp_F = [basis(3, i) for i in range(3)]
+zero_F, one_F, r_F, rp_F = [basis(4, i) for i in range(4)]
+I_F = qeye(4)
+H_data_F = Omega / 2 * (one_F * r_F.dag() + r_F * one_F.dag())
+H_anc_F = Omega_R / 2 * (A_F * R_F.dag() + R_F * A_F.dag())
+H_data_full_F = tensor(qeye(3), H_data_F, I_F) + tensor(qeye(3), I_F, H_data_F)
+H_anc_full_F = tensor(H_anc_F, I_F, I_F)
+pair1 = tensor(Rp_F * R_F.dag(), rp_F * r_F.dag(), I_F)
+pair2 = tensor(Rp_F * R_F.dag(), I_F, rp_F * r_F.dag())
+H_forster_full = V * (pair1 + pair1.dag() + pair2 + pair2.dag())
+assert H_forster_full.isherm
+
+
+def run_forster_gate(initial):
+    first = sesolve(H_data_full_F + H_forster_full, initial, first_times)
+    middle = sesolve(H_anc_full_F + H_forster_full,
+                     first.states[-1], middle_times)
+    last = sesolve(H_data_full_F + H_forster_full,
+                   middle.states[-1], last_times)
+    return first.states + middle.states[1:] + last.states[1:]
+
+
+comp_F = [tensor(A_F, zero_F, zero_F), tensor(A_F, zero_F, one_F),
+          tensor(A_F, one_F, zero_F), tensor(A_F, one_F, one_F)]
+forster_traces = [run_forster_gate(state) for state in comp_F]
+forster_matrix = np.array([[bra.overlap(trace[-1]) for trace in forster_traces]
+                           for bra in comp_F])
+forster_leakage = max(1 - np.sum(abs(forster_matrix) ** 2, axis=0))
+print(f"Truncated Förster gate: max leakage={forster_leakage:.6f}, "
+      f"max matrix deviation={np.max(abs(forster_matrix-paper_operation)):.6f}")
+P_R_F = tensor(R_F * R_F.dag(), I_F, I_F)
+plt.figure()
+plt.plot(gate_times, expect(P_R_F, forster_traces[0]), label=r"$|A00\rangle$")
+plt.plot(gate_times, expect(P_R_F, forster_traces[1]), label=r"$|A01\rangle$")
+plt.xlabel(r"Time ($\mu$s)")
+plt.ylabel(r"Ancilla $P_R$")
+plt.legend()
+plt.tight_layout()
 plt.show()
