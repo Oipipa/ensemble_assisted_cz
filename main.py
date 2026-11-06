@@ -593,4 +593,42 @@ plt.xlabel(r"$V_{Rr}/\Omega_r$")
 plt.ylabel(r"Bare $|1R\rangle$ weight in dark state")
 plt.ylim(0, 1.02)
 plt.tight_layout()
+
+R_projector = R * R.dag()
+forbidden = (tensor(R_projector, n_r, qeye(3))
+             + tensor(R_projector, qeye(3), n_r)
+             - tensor(R_projector, n_r, n_r))
+allowed = tensor(qeye(2), qeye(3), qeye(3)) - forbidden
+H_data_ideal = allowed * H_data_joint * allowed
+H_ancilla_ideal = allowed * H_ancilla_joint * allowed
+ideal_outputs = []
+for initial in computational_states:
+    first = sesolve(H_data_ideal, initial, first_times)
+    middle = sesolve(H_ancilla_ideal, first.states[-1], middle_times)
+    last = sesolve(H_data_ideal, middle.states[-1], last_times)
+    ideal_outputs.append(last.states[-1])
+ideal_matrix = np.array([[bra.overlap(out) for out in ideal_outputs]
+                         for bra in computational_states])
+
+model_matrices = {"Perfect projection": ideal_matrix,
+                  "Diagonal shift": effective_gate,
+                  "Förster coupling": forster_matrix}
+model_leakages = []
+model_phases = []
+for name, matrix in model_matrices.items():
+    model_leakages.append(max(1 - np.sum(abs(matrix) ** 2, axis=0)))
+    model_phases.append(max(abs(np.angle(np.diag(matrix) / np.diag(paper_operation)))))
+    print(f"{name}: leakage={model_leakages[-1]:.6f}, "
+          f"max phase error={model_phases[-1]:.6f} rad")
+assert np.max(abs(ideal_matrix - paper_operation)) < 1e-4
+
+model_fig, model_axes = plt.subplots(1, 2, figsize=(10, 3))
+names = list(model_matrices)
+model_axes[0].bar(names, model_leakages)
+model_axes[0].set_ylabel("Max computational leakage")
+model_axes[1].bar(names, model_phases)
+model_axes[1].set_ylabel("Max phase error (rad)")
+for ax in model_axes:
+    ax.tick_params(axis="x", labelrotation=20)
+model_fig.tight_layout()
 plt.show()
