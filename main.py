@@ -631,4 +631,69 @@ model_axes[1].set_ylabel("Max phase error (rad)")
 for ax in model_axes:
     ax.tick_params(axis="x", labelrotation=20)
 model_fig.tight_layout()
+
+shape_x = np.linspace(0, 1, 2001)
+shape = np.exp(-0.5 * ((shape_x - 0.5) / 0.25) ** 2) - np.exp(-2)
+shape_area = np.trapezoid(shape, shape_x)
+
+
+def smooth_scale(t, start):
+    x = (t - start) / data_pi_time
+    if x < 0 or x > 1:
+        return 0.0
+    return (np.exp(-0.5 * ((x - 0.5) / 0.25) ** 2) - np.exp(-2)) / shape_area
+
+
+assert abs(Omega * np.trapezoid([smooth_scale(t, 0) for t in first_times],
+                                   first_times) - np.pi) < 1e-4
+
+
+def run_forster_gate_smooth(initial):
+    first_hamiltonian = [H_forster_full,
+                         [H_data_full_F, lambda t: smooth_scale(t, 0)]]
+    last_start = data_pi_time + ancilla_2pi_time
+    last_hamiltonian = [H_forster_full,
+                        [H_data_full_F, lambda t: smooth_scale(t, last_start)]]
+    first = sesolve(first_hamiltonian, initial, first_times)
+    middle = sesolve(H_anc_full_F + H_forster_full,
+                     first.states[-1], middle_times)
+    last = sesolve(last_hamiltonian, middle.states[-1], last_times)
+    return last.states[-1]
+
+
+smooth_outputs = [run_forster_gate_smooth(state) for state in comp_F]
+smooth_matrix = np.array([[bra.overlap(out) for out in smooth_outputs]
+                          for bra in comp_F])
+smooth_leakage = max(1 - np.sum(abs(smooth_matrix) ** 2, axis=0))
+smooth_phase = max(abs(np.angle(np.diag(smooth_matrix) / np.diag(paper_operation))))
+data_F = [tensor(zero_F, zero_F), tensor(zero_F, one_F),
+          tensor(one_F, zero_F), tensor(one_F, one_F)]
+target_F = [-data_F[0], -data_F[1], -data_F[2], data_F[3]]
+P_comp_F = sum(state * state.dag() for state in data_F)
+
+
+def fidelity_from_pure_outputs(outputs):
+    basis_map = {(i, j): (outputs[i] * outputs[j].dag()).ptrace([1, 2])
+                 for i in range(4) for j in range(4)}
+    term_one = expect(P_comp_F, sum(basis_map[i, i] for i in range(4)))
+    term_two = sum(target_F[i].overlap(basis_map[i, j] * target_F[j])
+                   for i in range(4) for j in range(4))
+    return np.real((term_one + term_two) / 20)
+
+
+square_forster_fidelity = fidelity_from_pure_outputs([trace[-1] for trace in forster_traces])
+smooth_forster_fidelity = fidelity_from_pure_outputs(smooth_outputs)
+print(f"Same duration and area: square leakage={forster_leakage:.6f}, "
+      f"smooth leakage={smooth_leakage:.6f}, smooth phase error={smooth_phase:.6f}")
+print(f"Noiseless average fidelity: square={square_forster_fidelity:.6f}, "
+      f"smooth={smooth_forster_fidelity:.6f}")
+
+plt.figure()
+plt.plot(first_times, np.ones_like(first_times), label="Square")
+plt.plot(first_times, [smooth_scale(t, 0) for t in first_times],
+         label="Smooth Gaussian edges")
+plt.xlabel(r"Time ($\mu$s)")
+plt.ylabel(r"Drive amplitude / $\Omega_r$")
+plt.legend()
+plt.tight_layout()
 plt.show()
