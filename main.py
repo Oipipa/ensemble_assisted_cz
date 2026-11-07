@@ -696,4 +696,57 @@ plt.xlabel(r"Time ($\mu$s)")
 plt.ylabel(r"Drive amplitude / $\Omega_r$")
 plt.legend()
 plt.tight_layout()
+
+
+def variable_drive_outputs(omega, smooth):
+    td = np.pi / omega
+    ta = 2 * np.pi / omega
+    t1 = np.linspace(0, td, 121)
+    t2 = np.linspace(td, td + ta, 241)
+    t3 = np.linspace(td + ta, 2 * td + ta, 121)
+    h_data = omega / Omega * H_data_full_F
+    h_ancilla = omega / Omega_R * H_anc_full_F
+
+    def envelope(t, start):
+        x = (t - start) / td
+        if x < 0 or x > 1:
+            return 0.0
+        return (np.exp(-0.5 * ((x - 0.5) / 0.25) ** 2) - np.exp(-2)) / shape_area
+
+    if smooth:
+        first_h = [H_forster_full, [h_data, lambda t: envelope(t, 0)]]
+        last_h = [H_forster_full, [h_data, lambda t: envelope(t, td + ta)]]
+    else:
+        first_h = h_data + H_forster_full
+        last_h = first_h
+
+    outputs = []
+    for initial in comp_F:
+        first = sesolve(first_h, initial, t1)
+        middle = sesolve(h_ancilla + H_forster_full, first.states[-1], t2)
+        last = sesolve(last_h, middle.states[-1], t3)
+        outputs.append(last.states[-1])
+    return outputs
+
+
+drive_mhz = np.array([5, 7.5, 10, 12.5, 15, 20, 25, 30, 40])
+square_estimated = []
+smooth_estimated = []
+for mhz in drive_mhz:
+    omega = 2 * np.pi * mhz
+    decay_estimate = Gamma_r * 3 * np.pi / omega + Gamma_ancilla * 6 * np.pi / (5 * omega)
+    square_value = fidelity_from_pure_outputs(variable_drive_outputs(omega, False))
+    smooth_value = fidelity_from_pure_outputs(variable_drive_outputs(omega, True))
+    square_estimated.append(square_value - decay_estimate)
+    smooth_estimated.append(smooth_value - decay_estimate)
+    print(f"Drive {mhz:g} MHz: square estimated={square_estimated[-1]:.6f}, "
+          f"smooth estimated={smooth_estimated[-1]:.6f}")
+
+plt.figure()
+plt.plot(drive_mhz, square_estimated, "o-", label="Square")
+plt.plot(drive_mhz, smooth_estimated, "s-", label="Smooth Gaussian edges")
+plt.xlabel("Data and ancilla Rabi frequency (MHz)")
+plt.ylabel("Unitary fidelity minus decay estimate")
+plt.legend()
+plt.tight_layout()
 plt.show()
