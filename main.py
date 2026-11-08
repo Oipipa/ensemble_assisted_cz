@@ -698,14 +698,21 @@ plt.legend()
 plt.tight_layout()
 
 
-def variable_drive_outputs(omega, smooth):
-    td = np.pi / omega
-    ta = 2 * np.pi / omega
+def variable_drive_outputs(omega, smooth, detuning=0, amplitude_error=0,
+                           duration_error=0, interaction_ratio=1):
+    td = np.pi / omega * (1 + duration_error)
+    ta = 2 * np.pi / omega * (1 + duration_error)
     t1 = np.linspace(0, td, 121)
     t2 = np.linspace(td, td + ta, 241)
     t3 = np.linspace(td + ta, 2 * td + ta, 121)
-    h_data = omega / Omega * H_data_full_F
-    h_ancilla = omega / Omega_R * H_anc_full_F
+    h_data = omega / Omega * (1 + amplitude_error) * H_data_full_F
+    h_ancilla = omega / Omega_R * (1 + amplitude_error) * H_anc_full_F
+    interaction = interaction_ratio * H_forster_full
+    data_r = r_F * r_F.dag()
+    detuning_term = -detuning * (
+        tensor(qeye(3), data_r, I_F) + tensor(qeye(3), I_F, data_r)
+        + tensor(R_F * R_F.dag(), I_F, I_F))
+    idle = interaction + detuning_term
 
     def envelope(t, start):
         x = (t - start) / td
@@ -714,16 +721,16 @@ def variable_drive_outputs(omega, smooth):
         return (np.exp(-0.5 * ((x - 0.5) / 0.25) ** 2) - np.exp(-2)) / shape_area
 
     if smooth:
-        first_h = [H_forster_full, [h_data, lambda t: envelope(t, 0)]]
-        last_h = [H_forster_full, [h_data, lambda t: envelope(t, td + ta)]]
+        first_h = [idle, [h_data, lambda t: envelope(t, 0)]]
+        last_h = [idle, [h_data, lambda t: envelope(t, td + ta)]]
     else:
-        first_h = h_data + H_forster_full
+        first_h = h_data + idle
         last_h = first_h
 
     outputs = []
     for initial in comp_F:
         first = sesolve(first_h, initial, t1)
-        middle = sesolve(h_ancilla + H_forster_full, first.states[-1], t2)
+        middle = sesolve(h_ancilla + idle, first.states[-1], t2)
         last = sesolve(last_h, middle.states[-1], t3)
         outputs.append(last.states[-1])
     return outputs
@@ -749,4 +756,38 @@ plt.xlabel("Data and ancilla Rabi frequency (MHz)")
 plt.ylabel("Unitary fidelity minus decay estimate")
 plt.legend()
 plt.tight_layout()
+
+# Robustness sweeps use the truncated Förster model without decay.
+error_values = np.linspace(-0.10, 0.10, 7)
+detuning_values = np.linspace(-0.10, 0.10, 7)
+robustness = {}
+for smooth in (False, True):
+    grid = np.empty((len(detuning_values), len(error_values)))
+    for i, detuning_fraction in enumerate(detuning_values):
+        for j, duration_error in enumerate(error_values):
+            grid[i, j] = fidelity_from_pure_outputs(variable_drive_outputs(
+                Omega, smooth, detuning=detuning_fraction * Omega,
+                duration_error=duration_error))
+    robustness[smooth] = grid
+    print(f"{'Smooth' if smooth else 'Square'} robustness: "
+          f"center={grid[3, 3]:.6f}, corner={grid[0, 0]:.6f}, "
+          f"minimum={grid.min():.6f}")
+
+fig, axes = plt.subplots(1, 2, figsize=(9, 3.5), sharey=True)
+for ax, smooth in zip(axes, (False, True)):
+    im = ax.imshow(robustness[smooth], origin="lower", aspect="auto",
+                   extent=[-10, 10, -10, 10], vmin=0.5, vmax=1)
+    ax.set_title("Smooth" if smooth else "Square")
+    ax.set_xlabel("Pulse duration error (%)")
+axes[0].set_ylabel(r"Detuning / $\Omega$ (%)")
+fig.colorbar(im, ax=axes, label="Noiseless average fidelity")
+fig.savefig("figures/robustness_forster.png", dpi=180, bbox_inches="tight")
+
+for parameter, values in (("amplitude_error", [-0.1, 0, 0.1]),
+                          ("interaction_ratio", [0.5, 1, 1.5])):
+    for smooth in (False, True):
+        fidelities = [fidelity_from_pure_outputs(variable_drive_outputs(
+            Omega, smooth, **{parameter: value})) for value in values]
+        print(f"{parameter} {values}, {'smooth' if smooth else 'square'}: "
+              + ", ".join(f"{value:.6f}" for value in fidelities))
 plt.show()
