@@ -2,6 +2,10 @@ import matplotlib.pyplot as plt
 import numpy as np
 from pathlib import Path
 from qutip import basis, expect, qeye, sesolve, tensor
+from models import forster_operators
+from pulses import smooth_envelope, variable_drive_outputs as pulse_outputs
+from fidelity import average_from_basis, average_from_pure_outputs
+from plots import robustness_heatmaps
 
 
 zero = basis(3, 0)
@@ -462,13 +466,7 @@ assert abs(average_fidelity - monte_carlo_fidelity) < 5e-4
 
 
 def fidelity_from_basis(basis_outputs):
-    identity = sum(basis_outputs[i, i] for i in range(4))
-    term_one = expect(P_comp_data, identity)
-    term_two = sum(
-        target_data_states[i].overlap(basis_outputs[i, j] * target_data_states[j])
-        for i in range(4) for j in range(4)
-    )
-    return np.real((term_one + term_two) / 20)
+    return average_from_basis(basis_outputs, target_data_states, P_comp_data)
 
 
 assert abs(fidelity_from_basis(channel_basis) - average_fidelity) < 1e-10
@@ -520,16 +518,9 @@ plt.ylabel("Population")
 plt.legend()
 plt.tight_layout()
 
-A_F, R_F, Rp_F = [basis(3, i) for i in range(3)]
-zero_F, one_F, r_F, rp_F = [basis(4, i) for i in range(4)]
-I_F = qeye(4)
-H_data_F = Omega / 2 * (one_F * r_F.dag() + r_F * one_F.dag())
-H_anc_F = Omega_R / 2 * (A_F * R_F.dag() + R_F * A_F.dag())
-H_data_full_F = tensor(qeye(3), H_data_F, I_F) + tensor(qeye(3), I_F, H_data_F)
-H_anc_full_F = tensor(H_anc_F, I_F, I_F)
-pair1 = tensor(Rp_F * R_F.dag(), rp_F * r_F.dag(), I_F)
-pair2 = tensor(Rp_F * R_F.dag(), I_F, rp_F * r_F.dag())
-H_forster_full = V * (pair1 + pair1.dag() + pair2 + pair2.dag())
+(A_F, R_F, Rp_F, zero_F, one_F, r_F, rp_F, I_F,
+ H_data_full_F, H_anc_full_F, H_forster_full,
+ comp_F) = forster_operators(Omega, Omega_R, V)
 assert H_forster_full.isherm
 
 
@@ -542,8 +533,6 @@ def run_forster_gate(initial):
     return first.states + middle.states[1:] + last.states[1:]
 
 
-comp_F = [tensor(A_F, zero_F, zero_F), tensor(A_F, zero_F, one_F),
-          tensor(A_F, one_F, zero_F), tensor(A_F, one_F, one_F)]
 forster_traces = [run_forster_gate(state) for state in comp_F]
 forster_matrix = np.array([[bra.overlap(trace[-1]) for trace in forster_traces]
                            for bra in comp_F])
@@ -638,10 +627,7 @@ shape_area = np.trapezoid(shape, shape_x)
 
 
 def smooth_scale(t, start):
-    x = (t - start) / data_pi_time
-    if x < 0 or x > 1:
-        return 0.0
-    return (np.exp(-0.5 * ((x - 0.5) / 0.25) ** 2) - np.exp(-2)) / shape_area
+    return smooth_envelope(t, start, data_pi_time, shape_area)
 
 
 assert abs(Omega * np.trapezoid([smooth_scale(t, 0) for t in first_times],
@@ -673,12 +659,7 @@ P_comp_F = sum(state * state.dag() for state in data_F)
 
 
 def fidelity_from_pure_outputs(outputs):
-    basis_map = {(i, j): (outputs[i] * outputs[j].dag()).ptrace([1, 2])
-                 for i in range(4) for j in range(4)}
-    term_one = expect(P_comp_F, sum(basis_map[i, i] for i in range(4)))
-    term_two = sum(target_F[i].overlap(basis_map[i, j] * target_F[j])
-                   for i in range(4) for j in range(4))
-    return np.real((term_one + term_two) / 20)
+    return average_from_pure_outputs(outputs, target_F, P_comp_F)
 
 
 square_forster_fidelity = fidelity_from_pure_outputs([trace[-1] for trace in forster_traces])
@@ -698,42 +679,10 @@ plt.legend()
 plt.tight_layout()
 
 
-def variable_drive_outputs(omega, smooth, detuning=0, amplitude_error=0,
-                           duration_error=0, interaction_ratio=1):
-    td = np.pi / omega * (1 + duration_error)
-    ta = 2 * np.pi / omega * (1 + duration_error)
-    t1 = np.linspace(0, td, 121)
-    t2 = np.linspace(td, td + ta, 241)
-    t3 = np.linspace(td + ta, 2 * td + ta, 121)
-    h_data = omega / Omega * (1 + amplitude_error) * H_data_full_F
-    h_ancilla = omega / Omega_R * (1 + amplitude_error) * H_anc_full_F
-    interaction = interaction_ratio * H_forster_full
-    data_r = r_F * r_F.dag()
-    detuning_term = -detuning * (
-        tensor(qeye(3), data_r, I_F) + tensor(qeye(3), I_F, data_r)
-        + tensor(R_F * R_F.dag(), I_F, I_F))
-    idle = interaction + detuning_term
-
-    def envelope(t, start):
-        x = (t - start) / td
-        if x < 0 or x > 1:
-            return 0.0
-        return (np.exp(-0.5 * ((x - 0.5) / 0.25) ** 2) - np.exp(-2)) / shape_area
-
-    if smooth:
-        first_h = [idle, [h_data, lambda t: envelope(t, 0)]]
-        last_h = [idle, [h_data, lambda t: envelope(t, td + ta)]]
-    else:
-        first_h = h_data + idle
-        last_h = first_h
-
-    outputs = []
-    for initial in comp_F:
-        first = sesolve(first_h, initial, t1)
-        middle = sesolve(h_ancilla + idle, first.states[-1], t2)
-        last = sesolve(last_h, middle.states[-1], t3)
-        outputs.append(last.states[-1])
-    return outputs
+def variable_drive_outputs(omega, smooth, **errors):
+    return pulse_outputs(omega, smooth, Omega, H_data_full_F, H_anc_full_F,
+                         H_forster_full, comp_F, r_F, R_F, shape_area,
+                         **errors)
 
 
 drive_mhz = np.array([5, 7.5, 10, 12.5, 15, 20, 25, 30, 40])
@@ -773,15 +722,8 @@ for smooth in (False, True):
           f"center={grid[3, 3]:.6f}, corner={grid[0, 0]:.6f}, "
           f"minimum={grid.min():.6f}")
 
-fig, axes = plt.subplots(1, 2, figsize=(9, 3.5), sharey=True)
-for ax, smooth in zip(axes, (False, True)):
-    im = ax.imshow(robustness[smooth], origin="lower", aspect="auto",
-                   extent=[-10, 10, -10, 10], vmin=0.5, vmax=1)
-    ax.set_title("Smooth" if smooth else "Square")
-    ax.set_xlabel("Pulse duration error (%)")
-axes[0].set_ylabel(r"Detuning / $\Omega$ (%)")
-fig.colorbar(im, ax=axes, label="Noiseless average fidelity")
-fig.savefig("figures/robustness_forster.png", dpi=180, bbox_inches="tight")
+robustness_heatmaps(robustness[False], robustness[True],
+                    "figures/robustness_forster.png")
 
 for parameter, values in (("amplitude_error", [-0.1, 0, 0.1]),
                           ("interaction_ratio", [0.5, 1, 1.5])):
