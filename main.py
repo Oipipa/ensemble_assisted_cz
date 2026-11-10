@@ -211,6 +211,7 @@ phase_axes[0].set_ylim(0, 1.05)
 phase_axes[1].bar([label for label, _ in inputs], relative_phases)
 phase_axes[1].set_ylabel("Phase relative to 00 (rad)")
 phase_fig.tight_layout()
+phase_fig.savefig("figures/effective_gate_phases.png", dpi=180)
 
 computational_states = [tensor(A, data_state) for _, data_state in inputs]
 effective_gate = np.array([
@@ -620,6 +621,7 @@ model_axes[1].set_ylabel("Max phase error (rad)")
 for ax in model_axes:
     ax.tick_params(axis="x", labelrotation=20)
 model_fig.tight_layout()
+model_fig.savefig("figures/blockade_models.png", dpi=180)
 
 shape_x = np.linspace(0, 1, 2001)
 shape = np.exp(-0.5 * ((shape_x - 0.5) / 0.25) ** 2) - np.exp(-2)
@@ -698,13 +700,14 @@ for mhz in drive_mhz:
     print(f"Drive {mhz:g} MHz: square estimated={square_estimated[-1]:.6f}, "
           f"smooth estimated={smooth_estimated[-1]:.6f}")
 
-plt.figure()
+drive_fig = plt.figure()
 plt.plot(drive_mhz, square_estimated, "o-", label="Square")
 plt.plot(drive_mhz, smooth_estimated, "s-", label="Smooth Gaussian edges")
 plt.xlabel("Data and ancilla Rabi frequency (MHz)")
 plt.ylabel("Unitary fidelity minus decay estimate")
 plt.legend()
 plt.tight_layout()
+drive_fig.savefig("figures/drive_sweep_estimate.png", dpi=180)
 
 # Robustness sweeps use the truncated Förster model without decay.
 error_values = np.linspace(-0.10, 0.10, 7)
@@ -732,4 +735,21 @@ for parameter, values in (("amplitude_error", [-0.1, 0, 0.1]),
             Omega, smooth, **{parameter: value})) for value in values]
         print(f"{parameter} {values}, {'smooth' if smooth else 'square'}: "
               + ", ".join(f"{value:.6f}" for value in fidelities))
+Path("results").mkdir(exist_ok=True)
+np.savetxt("results/drive_sweep.csv",
+           np.column_stack([drive_mhz, square_estimated, smooth_estimated]),
+           delimiter=",", header="drive_mhz,square_estimate,smooth_estimate",
+           comments="")
+for smooth in (False, True):
+    profile = "smooth" if smooth else "square"
+    np.savetxt(f"results/robustness_{profile}.csv", robustness[smooth],
+               delimiter=",", fmt="%.9f")
+np.savetxt("results/gate_summary.csv",
+           np.array([[isolated_fidelity["no_decay"],
+                      isolated_fidelity["data_only"],
+                      isolated_fidelity["ancilla_only"], average_fidelity,
+                      square_forster_fidelity, smooth_forster_fidelity]]),
+           delimiter=",",
+           header="diagonal_no_decay,diagonal_data_decay,diagonal_ancilla_decay,diagonal_both_decay,forster_square_no_decay,forster_smooth_no_decay",
+           comments="")
 plt.show()
