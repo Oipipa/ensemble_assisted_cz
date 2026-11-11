@@ -4,7 +4,7 @@ The first model uses a diagonal shift $V_{Rr}|Rr\rangle\langle Rr|$ for each dat
 
 ![Computed population dynamics](figures/fig3c_effective.png)
 
-The target in [Eq. (4)](https://arxiv.org/html/2503.16896v1) is $\operatorname{diag}(-1,-1,-1,+1)=-CZ$. The diagonal model gives $\operatorname{diag}(-1,-0.9969-0.0783i,-0.9969-0.0783i,0.9992+0.0392i)$. Its largest phase error is 0.078393 rad despite leakage of only $1.54\times10^{-5}$. This is why population return alone overstates gate quality.
+The target in [Eq. (4)](https://arxiv.org/html/2503.16896v1) is $\text{diag}(-1,-1,-1,+1)=-CZ$. The diagonal model gives $\text{diag}(-1,-0.9969-0.0783i,-0.9969-0.0783i,0.9992+0.0392i)$. Its largest phase error is 0.078393 rad despite leakage of only $1.54\times10^{-5}$. This is why population return alone overstates gate quality.
 
 The alternative model implements resonant $|rR\rangle\leftrightarrow|r'R'\rangle$ coupling from [Supplementary Eq. (29)](https://arxiv.org/html/2503.16896v1). It leaves out other pair states. The predicted dark state is proportional to $2V_{Rr}|1R\rangle-\Omega_r|r'R'\rangle$; its numerical energy differs from zero by less than $3.87\times10^{-12}\,\mathrm{rad}/\mu\mathrm{s}$. In the full gate, this truncated model gives 0.000773 maximum leakage and no measurable relative phase error. Its noiseless average fidelity is 99.9806%.
 
