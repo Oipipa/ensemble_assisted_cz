@@ -1,10 +1,10 @@
 [Zhang, Arunseangroj, and Xu (2025)](https://arxiv.org/abs/2503.16896) propose an ensemble-assisted CZ gate. This repository simulates its data $\pi$ pulse, ancilla $2\pi$ pulse, data $\pi$ pulse sequence. The data drive is $|1\rangle\leftrightarrow|r\rangle$; the ancilla drive is $|A\rangle\leftrightarrow|R\rangle$. The [Fig. 3(c)](https://arxiv.org/html/2503.16896v1) parameters give a $0.20\,\mu\mathrm{s}$ gate: $\Omega_r=\Omega_R=2\pi\times10$ MHz and $V_{Rr}=2\pi\times200$ MHz.
 
-In the diagonal-blockade model, peak ancilla $|R\rangle$ population is 1.000000 for $|A00\rangle$, 0.002494 for $|A01\rangle$, and 0.000625 for $|A11\rangle$. The corresponding return probabilities are 1.000000, 0.999985, and 0.999999. The pulse timing and blockade pattern agree qualitatively with Fig. 3(c). The paper supplies a plot, not raw population values, so no pointwise numerical agreement is claimed.
+In the diagonal-blockade model, peak ancilla $|R\rangle$ population is 1.000000 for $|A00\rangle$, 0.002494 for $|A01\rangle$, and 0.000625 for $|A11\rangle$. The corresponding return probabilities are 1.000000, 0.999985, and 0.999999. The pulse timing and blockade pattern agree qualitatively with Fig. 3(c). 
 
 ![Simulated gate populations](figures/fig3c_effective.png)
 
-The paper's [Eq. (4)](https://arxiv.org/html/2503.16896v1) gives $U=\operatorname{diag}(-1,-1,-1,+1)=-CZ$. The diagonal model instead gives $\operatorname{diag}(-1,-0.9969-0.0783i,-0.9969-0.0783i,0.9992+0.0392i)$. Leakage is only $1.54\times10^{-5}$, but the largest phase error is 0.078393 rad. A truncated resonant Förster model based on Supplementary Eq. (29) removes that phase error to numerical precision and has leakage 0.000773.
+The paper's [Eq. (4)](https://arxiv.org/html/2503.16896v1) gives $U=\text{diag}(-1,-1,-1,+1)=-CZ$. The diagonal model instead gives $\text{diag}(-1,-0.9969-0.0783i,-0.9969-0.0783i,0.9992+0.0392i)$. Leakage is only $1.54\times10^{-5}$, but the largest phase error is 0.078393 rad. A truncated resonant Förster model based on Supplementary Eq. (29) removes that phase error to numerical precision and has leakage 0.000773.
 
 ![Blockade-model comparison](figures/blockade_models.png)
 
