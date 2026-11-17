@@ -15,7 +15,3 @@ Our noisy diagonal-blockade model gives 99.7351% average fidelity. Its isolated 
 We also compare square and smooth data pulses with the same duration and pulse area. At 10 MHz, the noiseless Förster fidelity is 0.9998063 for the square pulse and 0.9998066 for the smooth pulse. The drive sweep uses a first-order decay correction rather than the full noisy calculation in [Supplementary Fig. 4(a)](https://arxiv.org/html/2503.16896v1). Under these pulse constraints, smoothing offers no consistent improvement.
 
 ![Drive sweep](figures/drive_sweep_estimate.png)
-
-Finally, we test sensitivity to detuning and pulse timing. Across a scan of $\pm0.1\Omega$ detuning and $\pm10\%$ duration error, the square-pulse fidelity falls as low as 0.685775. Smooth pulses show similar sensitivity. The numerical comparisons, assumptions, and remaining limitations are discussed in [report.md](report.md).
-
-![Control-error scan](figures/robustness_forster.png)
