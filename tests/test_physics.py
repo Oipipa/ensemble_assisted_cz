@@ -4,6 +4,7 @@ from qutip import basis, qeye, tensor
 from fidelity import average_from_basis, average_from_pure_outputs
 from models import forster_operators
 from pulses import smooth_envelope, variable_drive_outputs
+from reproduce import gate_point
 
 
 OMEGA = 2 * np.pi * 10
@@ -72,3 +73,19 @@ def test_detuning_and_timing_lower_fidelity():
                                       duration_error=0.1)
     assert average_from_pure_outputs(mistuned, targets, projector) < 0.9
     assert average_from_pure_outputs(baseline, targets, projector) > 0.9997
+
+
+def test_noisy_forster_reproduces_table_and_ancilla_shaping_suppresses_dip():
+    square_10, _ = gate_point(10)
+    assert abs(square_10 - 0.9980) < 0.0001
+    noiseless_10, _ = gate_point(10, noisy=False)
+    data_only, _ = gate_point(10, gamma_ancilla=0)
+    ancilla_only, _ = gate_point(10, gamma_data=0)
+    assert abs((noiseless_10 - data_only) - 0.0015) < 0.00002
+    assert abs((noiseless_10 - ancilla_only) - 0.0003) < 0.00002
+    square_30, square_leakage = gate_point(30, noisy=False)
+    smooth_30, smooth_leakage = gate_point(30, shape="ancilla", noisy=False)
+    assert square_30 < 0.99
+    assert smooth_30 > 0.9999
+    assert square_leakage > 0.01
+    assert smooth_leakage < 0.0001

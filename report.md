@@ -1,49 +1,36 @@
-# Numerical notes
+# Numerical findings
 
-The gate proposed by [Zhang, Arunseangroj, and Xu (2025)](https://arxiv.org/abs/2503.16896) uses two data atoms and an ensemble ancilla. The sequence begins with a $\pi$ pulse that excites data atoms from $|1\rangle$ to $|r\rangle$. An ancilla $2\pi$ pulse then drives $|A\rangle\leftrightarrow|R\rangle$, followed by a final data $\pi$ pulse that reverses the first. Rydberg interactions block the ancilla cycle whenever a data atom is excited.
+## Model and fidelity
 
-We use the parameters from [Fig. 3(c)](https://arxiv.org/html/2503.16896v1): $\Omega_r=\Omega_R=2\pi\times10$ MHz, $V_{Rr}=2\pi\times200$ MHz, and lifetimes of $100\,\mu\mathrm{s}$ for data $|r\rangle$ and $200\,\mu\mathrm{s}$ for ancilla $|A\rangle$ and $|R\rangle$.
+We model the ensemble-assisted CZ gate of [Zhang, Arunseangroj, and Xu (2025)](https://arxiv.org/html/2503.16896v1) with two data atoms and one ancilla. Data $|1\rangle\leftrightarrow|r\rangle$ and ancilla $|A\rangle\leftrightarrow|R\rangle$ are driven in a $\pi$–$2\pi$–$\pi$ sequence. The resonant pair coupling $|rR\rangle\leftrightarrow|r'R'\rangle$ follows Supplementary Eq. (29). At the 10 MHz baseline, the gate lasts 0.20 µs and $V_{Rr}=2\pi\times200$ MHz.
 
-## Population dynamics
+We compute the Haar-average fidelity of the **reduced two-data-qubit operation** to the paper's $-CZ$ target. The ancilla is traced out, and population outside the computational subspace lowers fidelity. Data Rydberg decay at $1/100\,\mu\mathrm{s}^{-1}$ and ancilla decay at $1/200\,\mu\mathrm{s}^{-1}$ are explicit quantum jumps. The calculation in [reproduce.py](reproduce.py) evolves the no-jump amplitudes and integrates all ancilla-jump trajectories. Data jumps enter the non-Hermitian survival evolution and cannot return to the target subspace. This is equivalent to the specified absorbing-loss Lindblad model for this fidelity, rather than a decay subtraction. We assign the same species lifetime to the primed Rydberg levels, whose lifetimes are not separately specified in the paper.
 
-The first model represents the interaction as a diagonal shift, $V_{Rr}|Rr\rangle\langle Rr|$, for each data atom. Over the $0.20\,\mu\mathrm{s}$ gate, the peak ancilla $|R\rangle$ populations are 1.000000, 0.002494, and 0.000625 for $|A00\rangle$, $|A01\rangle$, and $|A11\rangle$, respectively. Their final return probabilities are 1.000000, 0.999985, and 0.999999.
+## Baseline reproduction
 
-These results capture the gate mechanism shown in Fig. 3(c): the ancilla completes its cycle without an excited data atom, while Rydberg interactions suppress that cycle when excitation is present. 
+| Quantity at 10 MHz | Paper | This calculation |
+| --- | ---: | ---: |
+| Noisy CZ fidelity | 99.80% (Table II) | **99.8008%** |
+| Noiseless Förster fidelity | — | 99.9806% |
+| Maximum noiseless computational leakage | — | 0.0775% |
 
-![Computed population dynamics](figures/fig3c_effective.png)
+Switching on one decay mechanism at a time gives 0.1498 percentage points of data-decay error and 0.0300 percentage points of ancilla-decay error relative to the noiseless Förster result. The remaining noiseless blockade infidelity is 0.0194 percentage points. These round to the paper's Table II estimates of 0.15%, 0.03%, and 0.02%, respectively.
 
-## Gate phases and the Förster model
+The original diagonal-shift model gave 99.7351% noisy fidelity and a conditional phase error of 0.0784 rad. That interaction is useful as a contrasting approximation, but it is not the resonant Förster coupling used to explain the paper's high fidelity. Combining its decay contributions with the Förster blockade error was not a consistent reproduction. The full noisy Förster result now agrees with the paper's **rounded total fidelity**. The isolated error terms are calculated by switching off other decay channels, so their sum need not equal the combined infidelity exactly.
 
-The ideal gate in [Eq. (4)](https://arxiv.org/html/2503.16896v1) is $\mathrm{diag}(-1,-1,-1,+1)=-CZ$. Our diagonal-blockade model instead gives $\mathrm{diag}(-1,-0.9969-0.0783i,-0.9969-0.0783i,0.9992+0.0392i)$.
+## Drive-frequency dip and pulse shaping
 
-Although leakage is only $1.54\times10^{-5}$, the largest phase error reaches 0.078393 rad. This shows why returning nearly all population to the computational states is not enough to guarantee a high-quality gate.
+The old plot smoothed the two data pulses only. During those pulses, the ancilla is predominantly $|A\rangle$, so the resonant pair interaction is inactive. Thus, data smoothing changed the curves negligibly. We infer that smoothing the ancilla $2\pi$ pulse is the relevant test of the paper's mechanism, since $|R\rangle$ and the coupled pair states are populated then. Square and smooth pulses have identical duration and integrated area. The smooth envelope is a truncated Gaussian with zero endpoints, width $0.25$ of the pulse duration, and area normalization. Its peak drive is higher than the square pulse's; the x axis denotes the **area-equivalent** Rabi frequency, not equal peak amplitude.
 
-To examine this difference, we also implement resonant $|rR\rangle\leftrightarrow|r'R'\rangle$ coupling based on [Supplementary Eq. (29)](https://arxiv.org/html/2503.16896v1), while leaving out other pair states. The predicted dark state is proportional to $2V_{Rr}|1R\rangle-\Omega_r|r'R'\rangle$. Its calculated energy differs from zero by less than $3.87\times10^{-12}\,\mathrm{rad}/\mu\mathrm{s}$.
+| Drive | Square noisy fidelity | Smooth ancilla noisy fidelity | Square / smooth maximum noiseless leakage |
+| ---: | ---: | ---: | ---: |
+| 10 MHz | 99.8008% | 99.8201% | 0.0775% / 0.00009% |
+| 30 MHz | 98.9020% | 99.9392% | 1.528% / 0.0014% |
+| 37.5 MHz | 98.1468% | 99.9492% | 2.736% / 0.0055% |
+| 40 MHz | 99.9052% | 99.9426% | 0.150% / 0.0220% |
 
-For the full gate, this truncated Förster model gives a maximum leakage of 0.000773, no measurable relative phase error, and a noiseless average fidelity of 99.9806%.
+![Noisy fidelity and leakage](figures/drive_sweep_noisy.png)
 
-## Fidelity comparison
+The 30 MHz dip is a coherent finite-coupling effect in this truncated model, not a visible solver artifact. Tightening the solver from relative tolerance $2\times10^{-9}$ to $2\times10^{-11}$ and doubling jump-integration quadrature from 32 to 64 nodes changes the 30 MHz fidelities by less than $2\times10^{-9}$. The square curve oscillates and recovers at 40 MHz; the smooth ancilla curve strongly suppresses those oscillations. This reproduces the qualitative behavior of Supplementary Fig. 4(a).
 
-The paper's [Table II](https://arxiv.org/html/2503.16896v1) reports 99.80% gate fidelity. Here, we calculate fidelity as the Haar-average overlap between the data-qubit quantum operation and the target in Eq. (4), tracing out the ancilla while retaining leakage. The noisy simulation evolves 16 basis operators with simplified decay into loss states.
-
-The table compares our results with the reported values. Differences are in percentage points, calculated as our result minus the paper's value.
-
-| Quantity | Paper | Here | Difference |
-| --- | ---: | ---: | ---: |
-| Average fidelity | 99.8000% | 99.7351% | $-0.0649$ |
-| Data decay error | 0.1500% | 0.1498% | $-0.0002$ |
-| Ancilla decay error | 0.0300% | 0.0299% | $-0.0001$ |
-| Blockade error, diagonal model | 0.0200% | 0.0852% | $+0.0652$ |
-| Blockade error, noiseless Förster model | 0.0200% | 0.0194% | $-0.0006$ |
-
-The first four computed entries use the diagonal interaction, while the last uses the truncated Förster interaction without decay. The decay errors are measured separately in the diagonal model and should not be added as independent contributions to the combined channel.
-
-The data-decay population integral also gives 0.1500%, consistent with [Supplementary Eq. (28)](https://arxiv.org/html/2503.16896v1). 
-
-## Pulse shaping and drive strength
-
-[Supplementary Fig. 4(a)](https://arxiv.org/html/2503.16896v1) reports better high-drive performance with smooth pulses. We test a smooth data pulse with Gaussian-like edges, keeping the same duration and area as the square pulse. The ancilla pulse remains square.
-
-At 10 MHz, the noiseless Förster fidelities are 0.9998063 for the square pulse and 0.9998066 for the smooth pulse. The drive sweep from 5 to 40 MHz applies first-order decay estimates to the noiseless results rather than simulating the full noisy dynamics. Under these pulse constraints, smoothing gives no consistent advantage, so the published high-drive improvement is not reproduced here.
-
-![Drive-strength comparison](figures/drive_sweep_estimate.png)
+The paper does not provide enough pulse-shape detail for a unique point-by-point match to that figure. Our model also omits other Rydberg pair states, interaction inhomogeneity, and other experimental errors. The reproduced 99.80% baseline and high-drive trend are therefore results for the stated truncated model and pulse constraint.
