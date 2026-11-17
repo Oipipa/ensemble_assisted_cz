@@ -47,13 +47,3 @@ The data-decay population integral also gives 0.1500%, consistent with [Suppleme
 At 10 MHz, the noiseless Förster fidelities are 0.9998063 for the square pulse and 0.9998066 for the smooth pulse. The drive sweep from 5 to 40 MHz applies first-order decay estimates to the noiseless results rather than simulating the full noisy dynamics. Under these pulse constraints, smoothing gives no consistent advantage, so the published high-drive improvement is not reproduced here.
 
 ![Drive-strength comparison](figures/drive_sweep_estimate.png)
-
-## Sensitivity to control errors
-
-We also test how the gate responds to imperfect controls. At 10 MHz, a scan over $\pm10\%$ detuning and pulse-duration errors gives a calibrated square-pulse fidelity of 0.999806, falling to 0.685775 at the worst sampled point. The smooth-pulse minimum is similar, at 0.688656.
-
-A 10% drive-amplitude error reduces square-pulse fidelity to 0.940478 or 0.934577, depending on the sign of the error. In contrast, changing the interaction strength by $\pm50\%$ keeps fidelity above 0.9997.
-
-These scans extend the truncated, noiseless Förster model. They explore its sensitivity to control settings rather than quantify uncertainties reported in the paper.
-
-![Control-error scan](figures/robustness_forster.png)
